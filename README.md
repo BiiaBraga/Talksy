@@ -66,19 +66,12 @@ Suporta:
 
 ## ⚙️ Como compilar e executar o Talksy
 
-### 1. Clonar ou baixar o projeto
-```powershell
-cd C:\Users\seu-usuario\Documentos\GitHub
-git clone https://github.com/seu-usuario/Talksy.git
-cd Talksy
-```
-
-### 2. Compilar
+### 1. Compilar
 ```powershell
 mvn clean compile
 ```
 
-### 3. Executar
+### 2. Executar
 ```powershell
 mvn exec:java
 ```
@@ -119,21 +112,5 @@ Talksy/
 
 ---
 
-## 🚀 Próximos passos
-
-- Empacotar como `.jar` executável:
-  ```powershell
-  mvn package
-  ```
-  O arquivo ficará em `target/talksy-1.0.0.jar`.  
-  Pode ser rodado com:
-  ```powershell
-  java -cp target/talksy-1.0.0.jar com.example.talksy.TalksyUI
-  ```
-
-- Personalizar o layout Swing (cores, fontes, ícones).
-
----
-
-## 👨‍💻 Autor
-Projeto acadêmico desenvolvido em Java, com ActiveMQ (JMS).
+## 👨‍💻 Autores
+Projeto acadêmico desenvolvido em Java, com ActiveMQ (JMS) por Beatriz Braga Silva e Lucas Silva Cardoso dos Santos
