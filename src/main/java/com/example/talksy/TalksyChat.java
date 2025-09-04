@@ -2,19 +2,9 @@ package com.example.talksy;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 
-import javax.jms.Connection;
-import javax.jms.DeliveryMode;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.jms.TextMessage;
-import javax.jms.Topic;
-import javax.jms.Queue;
-
-import java.util.UUID;
+import javax.jms.*;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -35,6 +25,12 @@ public class TalksyChat {
     private static final String PUBLIC_TOPIC = "TALKSY.PUBLIC";
     private static final String PRIVATE_PREFIX = "TALKSY.PRIVATE.";
     private static final String PRESENCE_TYPE = "presence";
+
+    // tipos de presença
+    private static final String PRESENCE_JOIN = "join";
+    private static final String PRESENCE_LEAVE = "leave";
+    private static final String PRESENCE_SYNC_REQUEST = "sync_request";
+    private static final String PRESENCE_SYNC_RESPONSE = "sync_response";
 
     private static final Set<String> onlineUsers = ConcurrentHashMap.newKeySet();
 
@@ -75,8 +71,9 @@ public class TalksyChat {
 
         connection.start();
 
-        // Anunciar presença inicial
-        sendPresence("join");
+        // Anunciar presença e pedir lista
+        sendPresence(PRESENCE_JOIN);
+        sendPresence(PRESENCE_SYNC_REQUEST);
     }
 
     private void handleIncoming(Message message, boolean isPrivate) {
@@ -88,16 +85,29 @@ public class TalksyChat {
 
                 if (PRESENCE_TYPE.equals(type)) {
                     String action = tm.getText();
-                    if ("join".equals(action)) {
-                        onlineUsers.add(sender);
 
-                        // quando alguém entra, mando meu join de volta
-                        if (!sender.equals(username)) {
-                            sendPresence("join");
-                        }
-                    } else if ("leave".equals(action)) {
-                        onlineUsers.remove(sender);
+                    switch (action) {
+                        case PRESENCE_JOIN:
+                            onlineUsers.add(sender);
+                            break;
+
+                        case PRESENCE_LEAVE:
+                            onlineUsers.remove(sender);
+                            break;
+
+                        case PRESENCE_SYNC_REQUEST:
+                            // alguém pediu sincronização -> mando minha presença de volta
+                            if (!sender.equals(username)) {
+                                sendPresence(PRESENCE_SYNC_RESPONSE);
+                            }
+                            break;
+
+                        case PRESENCE_SYNC_RESPONSE:
+                            // alguém respondeu que está online
+                            onlineUsers.add(sender);
+                            break;
                     }
+
                     if (onPresenceUpdate != null) onPresenceUpdate.run();
                 } else {
                     // Mensagem normal
@@ -130,7 +140,7 @@ public class TalksyChat {
         p.close();
     }
 
-    /** Envia presença (join/leave) */
+    /** Envia presença (join/leave/sync) */
     public void sendPresence(String action) throws JMSException {
         TextMessage msg = session.createTextMessage(action);
         msg.setStringProperty("type", PRESENCE_TYPE);
@@ -139,7 +149,7 @@ public class TalksyChat {
     }
 
     public void close() {
-        try { sendPresence("leave"); } catch (Exception ignored) {}
+        try { sendPresence(PRESENCE_LEAVE); } catch (Exception ignored) {}
         try { if (publicConsumer != null) publicConsumer.close(); } catch (Exception ignored) {}
         try { if (privateConsumer != null) privateConsumer.close(); } catch (Exception ignored) {}
         try { if (publicProducer != null) publicProducer.close(); } catch (Exception ignored) {}

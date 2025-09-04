@@ -12,7 +12,7 @@ public class TalksyUI extends JFrame {
     private JTextField inputField;
     private JTextField userField;
     private JTextField brokerField;
-    private JButton connectBtn, sendBtn;
+    private JButton connectBtn, sendBtn, disconnectBtn;
     private JCheckBox privateCheck;
     private JList<String> userList;
     private DefaultListModel<String> userListModel;
@@ -37,8 +37,13 @@ public class TalksyUI extends JFrame {
         top.add(new JLabel("Broker:"));
         brokerField = new JTextField("tcp://localhost:61616", 20);
         top.add(brokerField);
+
         connectBtn = new JButton("Conectar");
+        disconnectBtn = new JButton("Sair do chat");
+        disconnectBtn.setEnabled(false); // só habilita após conexão
+
         top.add(connectBtn);
+        top.add(disconnectBtn);
 
         chatPane = new JTextPane();
         chatPane.setEditable(false);
@@ -70,6 +75,7 @@ public class TalksyUI extends JFrame {
         getContentPane().add(bottom, BorderLayout.SOUTH);
 
         connectBtn.addActionListener(e -> onConnect());
+        disconnectBtn.addActionListener(e -> onDisconnect());
         sendBtn.addActionListener(e -> onSend());
         inputField.addActionListener(e -> onSend());
 
@@ -91,6 +97,7 @@ public class TalksyUI extends JFrame {
             return;
         }
         connectBtn.setEnabled(false);
+        disconnectBtn.setEnabled(true);
         try {
             jms = new TalksyChat(broker, user);
             jms.setOnMessage((line, isPriv) -> SwingUtilities.invokeLater(() -> {
@@ -101,8 +108,21 @@ public class TalksyUI extends JFrame {
             appendSystem("Conectado como '" + user + "' em " + broker);
         } catch (Exception ex) {
             connectBtn.setEnabled(true);
+            disconnectBtn.setEnabled(false);
             JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
         }
+    }
+
+    private void onDisconnect() {
+        if (jms != null) {
+            jms.close();
+            jms = null;
+            appendSystem("Você saiu do chat.");
+        }
+        userListModel.clear();
+        setTitle("Talksy [desconectado]");
+        connectBtn.setEnabled(true);
+        disconnectBtn.setEnabled(false);
     }
 
     private void onSend() {
@@ -126,10 +146,12 @@ public class TalksyUI extends JFrame {
 
     private void updateUserList() {
         userListModel.clear();
-        for (String u : jms.getOnlineUsers()) {
-            userListModel.addElement(u);
+        if (jms != null) {
+            for (String u : jms.getOnlineUsers()) {
+                userListModel.addElement(u);
+            }
+            setTitle("Talksy [" + jms.getOnlineUsers().size() + " conectados]");
         }
-        setTitle("Talksy [" + jms.getOnlineUsers().size() + " conectados]");
     }
 
     private void appendMessage(String line, String sender) {
