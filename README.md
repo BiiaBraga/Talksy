@@ -54,7 +54,7 @@ Suporta:
 3. Para iniciar o broker:
    ```powershell
    cd C:\apache-activemq-5.18.3\bin
-   activemq.bat start
+   .\activemq.bat start
    ```
 4. Para verificar se subiu, abra no navegador:
    ```

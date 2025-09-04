@@ -6,9 +6,14 @@ import javax.jms.*;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
 
 public class TalksyChat {
+    // ===== Callback para entregar remetente, texto e se é privado =====
+    @FunctionalInterface
+    public interface MessageCallback {
+        void onMessage(String sender, String text, boolean isPrivate);
+    }
+
     private final String brokerUrl;
     private final String username;
 
@@ -19,7 +24,7 @@ public class TalksyChat {
     private MessageConsumer privateConsumer;
     private Topic publicTopic;
 
-    private BiConsumer<String, Boolean> onMessage;
+    private MessageCallback onMessage;
     private Runnable onPresenceUpdate;
 
     private static final String PUBLIC_TOPIC = "TALKSY.PUBLIC";
@@ -32,6 +37,7 @@ public class TalksyChat {
     private static final String PRESENCE_SYNC_REQUEST = "sync_request";
     private static final String PRESENCE_SYNC_RESPONSE = "sync_response";
 
+    // conjunto global (por processo) dos usuários online
     private static final Set<String> onlineUsers = ConcurrentHashMap.newKeySet();
 
     public TalksyChat(String brokerUrl, String username) {
@@ -39,7 +45,7 @@ public class TalksyChat {
         this.username = username;
     }
 
-    public void setOnMessage(BiConsumer<String, Boolean> onMessage) {
+    public void setOnMessage(MessageCallback onMessage) {
         this.onMessage = onMessage;
     }
 
@@ -78,58 +84,51 @@ public class TalksyChat {
 
     private void handleIncoming(Message message, boolean isPrivate) {
         try {
-            if (message instanceof TextMessage) {
-                TextMessage tm = (TextMessage) message;
-                String type = tm.getStringProperty("type");
-                String sender = tm.getStringProperty("sender");
+            if (!(message instanceof TextMessage)) return;
 
-                if (PRESENCE_TYPE.equals(type)) {
-                    String action = tm.getText();
+            TextMessage tm = (TextMessage) message;
+            String type = tm.getStringProperty("type");
+            String sender = tm.getStringProperty("sender");
 
-                    switch (action) {
-                        case PRESENCE_JOIN:
-                            onlineUsers.add(sender);
-                            break;
-
-                        case PRESENCE_LEAVE:
-                            onlineUsers.remove(sender);
-                            break;
-
-                        case PRESENCE_SYNC_REQUEST:
-                            // alguém pediu sincronização -> mando minha presença de volta
-                            if (!sender.equals(username)) {
-                                sendPresence(PRESENCE_SYNC_RESPONSE);
-                            }
-                            break;
-
-                        case PRESENCE_SYNC_RESPONSE:
-                            // alguém respondeu que está online
-                            onlineUsers.add(sender);
-                            break;
-                    }
-
-                    if (onPresenceUpdate != null) onPresenceUpdate.run();
-                } else {
-                    // Mensagem normal
-                    String text = tm.getText();
-                    String prefix = isPrivate ? "(privado) " : "";
-                    String line = String.format("%s%s: %s", prefix, sender, text);
-                    if (onMessage != null) onMessage.accept(line, isPrivate);
+            if (PRESENCE_TYPE.equals(type)) {
+                String action = tm.getText();
+                switch (action) {
+                    case PRESENCE_JOIN:
+                        onlineUsers.add(sender);
+                        break;
+                    case PRESENCE_LEAVE:
+                        onlineUsers.remove(sender);
+                        break;
+                    case PRESENCE_SYNC_REQUEST:
+                        if (!sender.equals(username)) {
+                            sendPresence(PRESENCE_SYNC_RESPONSE);
+                        }
+                        break;
+                    case PRESENCE_SYNC_RESPONSE:
+                        onlineUsers.add(sender);
+                        break;
                 }
+                if (onPresenceUpdate != null) onPresenceUpdate.run();
+                return;
             }
+
+            // mensagem normal -> entregar remetente e texto puro para a UI
+            String text = tm.getText();
+            if (onMessage != null) onMessage.onMessage(sender, text, isPrivate);
+
         } catch (JMSException e) {
-            if (onMessage != null) onMessage.accept("Erro: " + e.getMessage(), isPrivate);
+            // opcional: logar erro
         }
     }
 
-    /** Envia mensagem pública para o tópico */
+    /** Mensagem pública (Topic) */
     public void sendPublic(String text) throws JMSException {
         TextMessage msg = session.createTextMessage(text);
         msg.setStringProperty("sender", username);
         publicProducer.send(msg);
     }
 
-    /** Envia mensagem privada para uma fila específica */
+    /** Mensagem privada (Queue) */
     public void sendPrivate(String toUser, String text) throws JMSException {
         Queue targetQueue = session.createQueue(PRIVATE_PREFIX + toUser);
         MessageProducer p = session.createProducer(targetQueue);
@@ -140,7 +139,7 @@ public class TalksyChat {
         p.close();
     }
 
-    /** Envia presença (join/leave/sync) */
+    /** Envia presença (join/leave/sync_*) */
     public void sendPresence(String action) throws JMSException {
         TextMessage msg = session.createTextMessage(action);
         msg.setStringProperty("type", PRESENCE_TYPE);

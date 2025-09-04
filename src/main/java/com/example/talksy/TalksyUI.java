@@ -6,6 +6,7 @@ import javax.swing.text.*;
 import java.awt.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.List;
 
 public class TalksyUI extends JFrame {
     private JTextPane chatPane;
@@ -40,7 +41,7 @@ public class TalksyUI extends JFrame {
 
         connectBtn = new JButton("Conectar");
         disconnectBtn = new JButton("Sair do chat");
-        disconnectBtn.setEnabled(false); // só habilita após conexão
+        disconnectBtn.setEnabled(false);
 
         top.add(connectBtn);
         top.add(disconnectBtn);
@@ -82,9 +83,7 @@ public class TalksyUI extends JFrame {
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
-                if (jms != null) {
-                    jms.close();
-                }
+                if (jms != null) jms.close();
             }
         });
     }
@@ -100,10 +99,15 @@ public class TalksyUI extends JFrame {
         disconnectBtn.setEnabled(true);
         try {
             jms = new TalksyChat(broker, user);
-            jms.setOnMessage((line, isPriv) -> SwingUtilities.invokeLater(() -> {
-                appendMessage(line, user);
+
+            // Agora recebemos sender + text + isPrivate
+            jms.setOnMessage((sender, text, isPriv) -> SwingUtilities.invokeLater(() -> {
+                String prefix = isPriv ? "(privado) " : "";
+                String line = prefix + sender + ": " + text;
+                appendMessage(line, sender); // COR baseada no sender real
             }));
             jms.setOnPresenceUpdate(() -> SwingUtilities.invokeLater(this::updateUserList));
+
             jms.connect();
             appendSystem("Conectado como '" + user + "' em " + broker);
         } catch (Exception ex) {
@@ -135,9 +139,12 @@ public class TalksyUI extends JFrame {
             if (privateCheck.isSelected() && !userList.isSelectionEmpty()) {
                 String to = userList.getSelectedValue();
                 jms.sendPrivate(to, text);
-                appendMessage("(privado) Você → " + to + ": " + text, userField.getText());
+                // Mostramos localmente a cópia da mensagem privada enviada
+                String me = userField.getText();
+                appendMessage("(privado) Você → " + to + ": " + text, me);
             } else {
                 jms.sendPublic(text);
+                // Não precisamos inserir localmente: você vai receber pelo tópico
             }
         } catch (JMSException e) {
             JOptionPane.showMessageDialog(this, "Erro ao enviar: " + e.getMessage());
@@ -147,8 +154,12 @@ public class TalksyUI extends JFrame {
     private void updateUserList() {
         userListModel.clear();
         if (jms != null) {
-            for (String u : jms.getOnlineUsers()) {
+            List<String> sorted = new ArrayList<>(jms.getOnlineUsers());
+            Collections.sort(sorted, String.CASE_INSENSITIVE_ORDER);
+            for (String u : sorted) {
                 userListModel.addElement(u);
+                // garante que cada usuário já tenha uma cor definida
+                userColors.computeIfAbsent(u, this::colorFromName);
             }
             setTitle("Talksy [" + jms.getOnlineUsers().size() + " conectados]");
         }
@@ -156,10 +167,13 @@ public class TalksyUI extends JFrame {
 
     private void appendMessage(String line, String sender) {
         StyledDocument doc = chatPane.getStyledDocument();
-        Style style = doc.addStyle("user", null);
-        Color c = userColors.computeIfAbsent(sender, k -> randomColor());
-        StyleConstants.setForeground(style, c);
-        StyleConstants.setBold(style, true);
+        Style style = doc.getStyle(sender);
+        if (style == null) {
+            style = doc.addStyle(sender, null);
+            Color c = userColors.computeIfAbsent(sender, this::colorFromName);
+            StyleConstants.setForeground(style, c);
+            StyleConstants.setBold(style, true);
+        }
 
         try {
             String time = timeFormat.format(new Date());
@@ -172,18 +186,25 @@ public class TalksyUI extends JFrame {
     private void appendSystem(String msg) {
         try {
             StyledDocument doc = chatPane.getStyledDocument();
-            Style style = doc.addStyle("sys", null);
-            StyleConstants.setForeground(style, Color.GRAY);
-            StyleConstants.setItalic(style, true);
+            Style style = doc.getStyle("sys");
+            if (style == null) {
+                style = doc.addStyle("sys", null);
+                StyleConstants.setForeground(style, Color.GRAY);
+                StyleConstants.setItalic(style, true);
+            }
             doc.insertString(doc.getLength(), "[sistema] " + msg + "\n", style);
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
     }
 
-    private Color randomColor() {
-        Random r = new Random();
-        return new Color(r.nextInt(200), r.nextInt(200), r.nextInt(200));
+    // Cor determinística por nome (mesma cor em todas as janelas)
+    private Color colorFromName(String name) {
+        int h = Math.abs(name.toLowerCase(Locale.ROOT).hashCode());
+        float hue = (h % 360) / 360f; // 0..1
+        float sat = 0.65f;
+        float bri = 0.90f;
+        return Color.getHSBColor(hue, sat, bri);
     }
 
     public static void main(String[] args) {
