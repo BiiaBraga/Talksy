@@ -1,28 +1,22 @@
-/* =========================
- * TalksyChat.java
- * ========================= */
 package com.example.talksy;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 
 import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
 import javax.jms.DeliveryMode;
 import javax.jms.JMSException;
 import javax.jms.Message;
 import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
 import javax.jms.MessageProducer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import javax.jms.Topic;
-import javax.jms.Queue;   // <- aqui é a fila JMS que queremos
+import javax.jms.Queue;
 
 import java.util.UUID;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
-
 
 public class TalksyChat {
     private final String brokerUrl;
@@ -42,7 +36,6 @@ public class TalksyChat {
     private static final String PRIVATE_PREFIX = "TALKSY.PRIVATE.";
     private static final String PRESENCE_TYPE = "presence";
 
-    // Lista local de usuários online
     private static final Set<String> onlineUsers = ConcurrentHashMap.newKeySet();
 
     public TalksyChat(String brokerUrl, String username) {
@@ -74,7 +67,6 @@ public class TalksyChat {
         publicProducer = session.createProducer(publicTopic);
         publicProducer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
-        // Consumidores
         publicConsumer = session.createConsumer(publicTopic);
         publicConsumer.setMessageListener(msg -> handleIncoming(msg, false));
 
@@ -83,7 +75,7 @@ public class TalksyChat {
 
         connection.start();
 
-        // Anunciar presença
+        // Anunciar presença inicial
         sendPresence("join");
     }
 
@@ -99,25 +91,19 @@ public class TalksyChat {
                     if ("join".equals(action)) {
                         onlineUsers.add(sender);
 
-                        // 🚀 NOVO: se não for eu mesmo, respondo também com meu "join"
+                        // quando alguém entra, mando meu join de volta
                         if (!sender.equals(username)) {
-                            try {
-                                sendPresence("join");
-                            } catch (Exception e) {
-                                // só loga, não interrompe
-                                e.printStackTrace();
-                            }
+                            sendPresence("join");
                         }
                     } else if ("leave".equals(action)) {
                         onlineUsers.remove(sender);
                     }
                     if (onPresenceUpdate != null) onPresenceUpdate.run();
-                
                 } else {
+                    // Mensagem normal
                     String text = tm.getText();
-                    String line = String.format("%s%s: %s",
-                            isPrivate ? "(privado) " : "",
-                            sender, text);
+                    String prefix = isPrivate ? "(privado) " : "";
+                    String line = String.format("%s%s: %s", prefix, sender, text);
                     if (onMessage != null) onMessage.accept(line, isPrivate);
                 }
             }
@@ -126,12 +112,14 @@ public class TalksyChat {
         }
     }
 
+    /** Envia mensagem pública para o tópico */
     public void sendPublic(String text) throws JMSException {
         TextMessage msg = session.createTextMessage(text);
         msg.setStringProperty("sender", username);
         publicProducer.send(msg);
     }
 
+    /** Envia mensagem privada para uma fila específica */
     public void sendPrivate(String toUser, String text) throws JMSException {
         Queue targetQueue = session.createQueue(PRIVATE_PREFIX + toUser);
         MessageProducer p = session.createProducer(targetQueue);
@@ -142,7 +130,8 @@ public class TalksyChat {
         p.close();
     }
 
-    private void sendPresence(String action) throws JMSException {
+    /** Envia presença (join/leave) */
+    public void sendPresence(String action) throws JMSException {
         TextMessage msg = session.createTextMessage(action);
         msg.setStringProperty("type", PRESENCE_TYPE);
         msg.setStringProperty("sender", username);

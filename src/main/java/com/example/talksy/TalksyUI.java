@@ -1,6 +1,3 @@
-/* =========================
- * TalksyUI.java
- * ========================= */
 package com.example.talksy;
 
 import javax.jms.JMSException;
@@ -77,8 +74,11 @@ public class TalksyUI extends JFrame {
         inputField.addActionListener(e -> onSend());
 
         addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
-                if (jms != null) jms.close();
+                if (jms != null) {
+                    jms.close();
+                }
             }
         });
     }
@@ -141,11 +141,7 @@ public class TalksyUI extends JFrame {
 
         try {
             String time = timeFormat.format(new Date());
-            doc.insertString(doc.getLength(), "[" + time + "] " + sender + ": ", style);
-            Style msgStyle = doc.addStyle("msg", null);
-            StyleConstants.setBold(msgStyle, false);
-            StyleConstants.setForeground(msgStyle, Color.BLACK);
-            doc.insertString(doc.getLength(), line + "\n", msgStyle);
+            doc.insertString(doc.getLength(), "[" + time + "] " + line + "\n", style);
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
