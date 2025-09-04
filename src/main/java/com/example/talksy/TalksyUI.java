@@ -100,11 +100,15 @@ public class TalksyUI extends JFrame {
         try {
             jms = new TalksyChat(broker, user);
 
-            // Agora recebemos sender + text + isPrivate
+            // Agora também trata mensagens do "sistema"
             jms.setOnMessage((sender, text, isPriv) -> SwingUtilities.invokeLater(() -> {
-                String prefix = isPriv ? "(privado) " : "";
-                String line = prefix + sender + ": " + text;
-                appendMessage(line, sender); // COR baseada no sender real
+                if ("sistema".equals(sender)) {
+                    appendSystem(text);
+                } else {
+                    String prefix = isPriv ? "(privado) " : "";
+                    String line = prefix + sender + ": " + text;
+                    appendMessage(line, sender);
+                }
             }));
             jms.setOnPresenceUpdate(() -> SwingUtilities.invokeLater(this::updateUserList));
 
@@ -139,12 +143,10 @@ public class TalksyUI extends JFrame {
             if (privateCheck.isSelected() && !userList.isSelectionEmpty()) {
                 String to = userList.getSelectedValue();
                 jms.sendPrivate(to, text);
-                // Mostramos localmente a cópia da mensagem privada enviada
                 String me = userField.getText();
                 appendMessage("(privado) Você → " + to + ": " + text, me);
             } else {
                 jms.sendPublic(text);
-                // Não precisamos inserir localmente: você vai receber pelo tópico
             }
         } catch (JMSException e) {
             JOptionPane.showMessageDialog(this, "Erro ao enviar: " + e.getMessage());
@@ -158,7 +160,6 @@ public class TalksyUI extends JFrame {
             Collections.sort(sorted, String.CASE_INSENSITIVE_ORDER);
             for (String u : sorted) {
                 userListModel.addElement(u);
-                // garante que cada usuário já tenha uma cor definida
                 userColors.computeIfAbsent(u, this::colorFromName);
             }
             setTitle("Talksy [" + jms.getOnlineUsers().size() + " conectados]");
@@ -198,10 +199,9 @@ public class TalksyUI extends JFrame {
         }
     }
 
-    // Cor determinística por nome (mesma cor em todas as janelas)
     private Color colorFromName(String name) {
         int h = Math.abs(name.toLowerCase(Locale.ROOT).hashCode());
-        float hue = (h % 360) / 360f; // 0..1
+        float hue = (h % 360) / 360f;
         float sat = 0.65f;
         float bri = 0.90f;
         return Color.getHSBColor(hue, sat, bri);

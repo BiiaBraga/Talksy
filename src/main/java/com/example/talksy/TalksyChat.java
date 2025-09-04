@@ -95,15 +95,20 @@ public class TalksyChat {
                 switch (action) {
                     case PRESENCE_JOIN:
                         onlineUsers.add(sender);
+                        if (onMessage != null) onMessage.onMessage("sistema", sender + " entrou no chat.", false);
                         break;
+
                     case PRESENCE_LEAVE:
                         onlineUsers.remove(sender);
+                        if (onMessage != null) onMessage.onMessage("sistema", sender + " saiu do chat.", false);
                         break;
+
                     case PRESENCE_SYNC_REQUEST:
                         if (!sender.equals(username)) {
                             sendPresence(PRESENCE_SYNC_RESPONSE);
                         }
                         break;
+
                     case PRESENCE_SYNC_RESPONSE:
                         onlineUsers.add(sender);
                         break;

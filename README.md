@@ -97,6 +97,40 @@ Isso abre a janela do Talksy (Swing GUI).
 
 ---
 
+## 🧪 Executando em rede (múltiplos computadores)
+
+**No servidor (onde o AcitiveMQ vai rodar):**
+
+1. Suba o ActiveMQ:  
+   ```powershell
+   activemq start
+   ```
+
+2. Descubra o IP local:
+   ```powershell
+   ip config
+   ```
+   → Anote o IPv4, por exemplo: 192.168.1.19
+
+3. Garanta que a porta 61616 está liberada no firewall:
+   - Abra o Menu Iniciar → digite Firewall do Windows com Segurança Avançada → abra.
+   - Clique em Regras de Entrada → Nova Regra....
+   - Selecione Porta → Avançar.
+   - Escolha TCP e em Portas locais específicas digite: 61616
+   - Clique em Avançar → selecione Permitir a conexão.
+   - Marque os perfis (Domínio, Privado, Público) → Avançar.
+   - Nomeie a regra, ex: ActiveMQ 61616
+   - Clique em Concluir.
+
+**Nos clientes (outros PCs da rede):**
+1. No campo Broker, em vez de tcp://localhost:61616, digite:
+   tcp://<IP_DO_SERVIDOR>:61616
+   exemplo: tcp://192.168.1.19:61616
+
+   → Digite um apelido, ex.: `Biia` e conecte
+
+---
+
 ## 📂 Estrutura do projeto
 
 ```
