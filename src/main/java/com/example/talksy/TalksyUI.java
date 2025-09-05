@@ -2,209 +2,237 @@ package com.example.talksy;
 
 import javax.jms.JMSException;
 import javax.swing.*;
-import javax.swing.text.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.text.html.HTMLDocument;
+import javax.swing.text.html.HTMLEditorKit;
 import java.awt.*;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
 public class TalksyUI extends JFrame {
-    private JTextPane chatPane;
-    private JTextField inputField;
-    private JTextField userField;
-    private JTextField brokerField;
-    private JButton connectBtn, sendBtn, disconnectBtn;
-    private JCheckBox privateCheck;
-    private JList<String> userList;
-    private DefaultListModel<String> userListModel;
-
-    private TalksyChat jms;
+    private final TalksyChat chat;
+    private final JTextPane chatPane;
+    private final JTextField inputField;
+    private final JButton sendButton;
+    private final JButton privateButton; // novo botão
+    private final DefaultListModel<String> userListModel;
+    private final JList<String> userList;
     private final Map<String, Color> userColors = new HashMap<>();
-    private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
+
+    private final String myUsername;
+
+    private final HTMLEditorKit kit = new HTMLEditorKit();
+    private final HTMLDocument doc = new HTMLDocument();
 
     public TalksyUI() {
-        super("Talksy");
-        buildUI();
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(900, 600);
-        setLocationRelativeTo(null);
-    }
+        // ===== LOGIN =====
+        myUsername = JOptionPane.showInputDialog(
+                null,
+                "Digite seu nome de usuário:",
+                "Login no Talksy",
+                JOptionPane.PLAIN_MESSAGE
+        );
 
-    private void buildUI() {
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        top.add(new JLabel("Usuário:"));
-        userField = new JTextField(System.getProperty("user.name", "user"), 10);
-        top.add(userField);
-        top.add(new JLabel("Broker:"));
-        brokerField = new JTextField("tcp://localhost:61616", 20);
-        top.add(brokerField);
+        if (myUsername == null || myUsername.trim().isEmpty()) {
+            System.exit(0);
+        }
 
-        connectBtn = new JButton("Conectar");
-        disconnectBtn = new JButton("Sair do chat");
-        disconnectBtn.setEnabled(false);
+        setTitle("💬 Talksy Chat - " + myUsername);
 
-        top.add(connectBtn);
-        top.add(disconnectBtn);
+        // ===== BACKEND =====
+        chat = new TalksyChat("tcp://localhost:61616", myUsername);
 
+        // ===== ÁREA DE CHAT =====
         chatPane = new JTextPane();
+        chatPane.setEditorKit(kit);
+        chatPane.setDocument(doc);
         chatPane.setEditable(false);
-
-        userListModel = new DefaultListModel<>();
-        userList = new JList<>(userListModel);
-        JScrollPane userScroll = new JScrollPane(userList);
-        userScroll.setPreferredSize(new Dimension(150, 0));
+        chatPane.setBorder(new EmptyBorder(10, 10, 10, 10));
 
         JScrollPane chatScroll = new JScrollPane(chatPane);
 
-        JPanel bottom = new JPanel(new BorderLayout());
+        // ===== INPUT =====
         inputField = new JTextField();
-        sendBtn = new JButton("Enviar");
-        privateCheck = new JCheckBox("Mensagem Privada");
-        JPanel bottomRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        bottomRight.add(privateCheck);
-        bottomRight.add(sendBtn);
+        inputField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        inputField.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
 
-        bottom.add(inputField, BorderLayout.CENTER);
-        bottom.add(bottomRight, BorderLayout.EAST);
+        sendButton = new JButton("Enviar");
+        sendButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        sendButton.setBackground(new Color(25, 118, 210));
+        sendButton.setForeground(Color.WHITE);
 
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, userScroll, chatScroll);
-        split.setDividerLocation(150);
+        privateButton = new JButton("Privado");
+        privateButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        privateButton.setBackground(new Color(255, 152, 0)); // laranja
+        privateButton.setForeground(Color.WHITE);
 
-        getContentPane().setLayout(new BorderLayout(8, 8));
-        getContentPane().add(top, BorderLayout.NORTH);
-        getContentPane().add(split, BorderLayout.CENTER);
-        getContentPane().add(bottom, BorderLayout.SOUTH);
+        sendButton.setFocusPainted(false);
+        privateButton.setFocusPainted(false);
 
-        connectBtn.addActionListener(e -> onConnect());
-        disconnectBtn.addActionListener(e -> onDisconnect());
-        sendBtn.addActionListener(e -> onSend());
-        inputField.addActionListener(e -> onSend());
+        JPanel buttonPanel = new JPanel(new GridLayout(1, 2, 8, 0));
+        buttonPanel.add(sendButton);
+        buttonPanel.add(privateButton);
 
+        JPanel inputPanel = new JPanel(new BorderLayout(8, 8));
+        inputPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        inputPanel.add(inputField, BorderLayout.CENTER);
+        inputPanel.add(buttonPanel, BorderLayout.EAST);
+
+        // ===== LISTA DE USUÁRIOS =====
+        userListModel = new DefaultListModel<>();
+        userList = new JList<>(userListModel);
+        userList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        userList.setBorder(new EmptyBorder(10, 10, 10, 10));
+        JScrollPane userScroll = new JScrollPane(userList);
+        userScroll.setPreferredSize(new Dimension(200, 0));
+        userScroll.setBorder(BorderFactory.createTitledBorder("👥 Usuários Online"));
+
+        // ===== LAYOUT PRINCIPAL =====
+        setLayout(new BorderLayout());
+        add(chatScroll, BorderLayout.CENTER);
+        add(inputPanel, BorderLayout.SOUTH);
+        add(userScroll, BorderLayout.EAST);
+
+        // ===== EVENTOS =====
+        sendButton.addActionListener(e -> sendMessage(false));
+        privateButton.addActionListener(e -> sendMessage(true));
+        inputField.addActionListener(e -> sendMessage(false));
+
+        // ===== CALLBACKS =====
+        chat.setOnMessage((sender, text, isPrivate) ->
+                SwingUtilities.invokeLater(() -> appendMessage(sender, text, isPrivate)));
+
+        chat.setOnPresenceUpdate(() ->
+                SwingUtilities.invokeLater(() -> {
+                    userListModel.clear();
+                    for (String u : chat.getOnlineUsers()) {
+                        userListModel.addElement(u);
+                    }
+                }));
+
+        // ===== CONEXÃO =====
+        try {
+            chat.connect();
+            appendSystemMessage("🚀 Bem-vindo ao Talksy");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Erro ao conectar no servidor: " + ex.getMessage(),
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
+            System.exit(1);
+        }
+
+        // ===== FECHAR CONEXÃO AO SAIR =====
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
-            public void windowClosing(java.awt.event.WindowEvent e) {
-                if (jms != null) jms.close();
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                chat.close();
             }
         });
+
+        // ===== CONFIG JANELA =====
+        setSize(900, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
     }
 
-    private void onConnect() {
-        String user = userField.getText().trim();
-        String broker = brokerField.getText().trim();
-        if (user.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Informe o usuário");
+    private void sendMessage(boolean isPrivate) {
+        String text = inputField.getText().trim();
+        if (text.isEmpty()) {
             return;
         }
-        connectBtn.setEnabled(false);
-        disconnectBtn.setEnabled(true);
-        try {
-            jms = new TalksyChat(broker, user);
 
-            // Agora também trata mensagens do "sistema"
-            jms.setOnMessage((sender, text, isPriv) -> SwingUtilities.invokeLater(() -> {
-                if ("sistema".equals(sender)) {
-                    appendSystem(text);
-                } else {
-                    String prefix = isPriv ? "(privado) " : "";
-                    String line = prefix + sender + ": " + text;
-                    appendMessage(line, sender);
+        try {
+            if (isPrivate) {
+                String targetUser = userList.getSelectedValue();
+                if (targetUser == null) {
+                    appendSystemMessage("⚠️ Selecione um usuário na lista para enviar mensagem privada.");
+                    return;
                 }
-            }));
-            jms.setOnPresenceUpdate(() -> SwingUtilities.invokeLater(this::updateUserList));
 
-            jms.connect();
-            appendSystem("Conectado como '" + user + "' em " + broker);
-        } catch (Exception ex) {
-            connectBtn.setEnabled(true);
-            disconnectBtn.setEnabled(false);
-            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
-        }
-    }
+                appendMessage("Para " + targetUser, text, true);
+                chat.sendPrivate(targetUser, text);
 
-    private void onDisconnect() {
-        if (jms != null) {
-            jms.close();
-            jms = null;
-            appendSystem("Você saiu do chat.");
-        }
-        userListModel.clear();
-        setTitle("Talksy [desconectado]");
-        connectBtn.setEnabled(true);
-        disconnectBtn.setEnabled(false);
-    }
-
-    private void onSend() {
-        if (jms == null) return;
-        String text = inputField.getText().trim();
-        if (text.isEmpty()) return;
-        inputField.setText("");
-
-        try {
-            if (privateCheck.isSelected() && !userList.isSelectionEmpty()) {
-                String to = userList.getSelectedValue();
-                jms.sendPrivate(to, text);
-                String me = userField.getText();
-                appendMessage("(privado) Você → " + to + ": " + text, me);
             } else {
-                jms.sendPublic(text);
+                appendMessage(myUsername, text, false);
+                chat.sendPublic(text);
             }
-        } catch (JMSException e) {
-            JOptionPane.showMessageDialog(this, "Erro ao enviar: " + e.getMessage());
+
+            inputField.setText("");
+
+        } catch (JMSException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Erro ao enviar mensagem: " + ex.getMessage(),
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+            ex.printStackTrace();
         }
     }
 
-    private void updateUserList() {
-        userListModel.clear();
-        if (jms != null) {
-            List<String> sorted = new ArrayList<>(jms.getOnlineUsers());
-            Collections.sort(sorted, String.CASE_INSENSITIVE_ORDER);
-            for (String u : sorted) {
-                userListModel.addElement(u);
-                userColors.computeIfAbsent(u, this::colorFromName);
-            }
-            setTitle("Talksy [" + jms.getOnlineUsers().size() + " conectados]");
-        }
-    }
-
-    private void appendMessage(String line, String sender) {
-        StyledDocument doc = chatPane.getStyledDocument();
-        Style style = doc.getStyle(sender);
-        if (style == null) {
-            style = doc.addStyle(sender, null);
-            Color c = userColors.computeIfAbsent(sender, this::colorFromName);
-            StyleConstants.setForeground(style, c);
-            StyleConstants.setBold(style, true);
-        }
-
+    private void appendSystemMessage(String message) {
         try {
-            String time = timeFormat.format(new Date());
-            doc.insertString(doc.getLength(), "[" + time + "] " + line + "\n", style);
-        } catch (BadLocationException e) {
+            kit.insertHTML(doc, doc.getLength(),
+                    String.format("<p style='color:gray; text-align:center;'>%s</p>", message),
+                    0, 0, null);
+            chatPane.setCaretPosition(doc.getLength());
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void appendSystem(String msg) {
+    private void appendMessage(String sender, String message, boolean isPrivate) {
         try {
-            StyledDocument doc = chatPane.getStyledDocument();
-            Style style = doc.getStyle("sys");
-            if (style == null) {
-                style = doc.addStyle("sys", null);
-                StyleConstants.setForeground(style, Color.GRAY);
-                StyleConstants.setItalic(style, true);
+            String color = colorForUser(sender);
+            String align = sender.equals(myUsername) ? "right" : "left";
+            String bgColor;
+            String textColor;
+            String privateTag = "";
+
+            if ("sistema".equalsIgnoreCase(sender)) {
+                appendSystemMessage("🔔 " + message);
+                return;
             }
-            doc.insertString(doc.getLength(), "[sistema] " + msg + "\n", style);
-        } catch (BadLocationException e) {
+
+            if (sender.equals(myUsername)) {
+                bgColor = "#e3edf6ff";   // azul para mim
+                textColor = "black";
+            } else {
+                bgColor = "#f4dee6ff";   // cinza para outros
+                textColor = "black";
+            }
+
+            if (isPrivate) {
+                privateTag = "<i style='font-size:10px; color:#555;'> (privado)</i>";
+                bgColor = "#f6f3daff"; // fundo amarelo
+            }
+
+            kit.insertHTML(doc, doc.getLength(),
+                    String.format(
+                            "<div style='text-align:%s; margin:6px 0;'>"
+                                    + "<div style='display:inline-block; background:%s; color:%s; padding:10px 14px; "
+                                    + "border-radius:12px; max-width:60%%; font-size:14px; "
+                                    + "box-shadow:0 2px 5px rgba(0,0,0,0.15); word-wrap: break-word;'>"
+                                    + "<b style='color:%s;'>%s</b>%s<br>%s</div></div>",
+                            align, bgColor, textColor, color, sender, privateTag, message
+                    ),
+                    0, 0, null);
+
+            chatPane.setCaretPosition(doc.getLength());
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private Color colorFromName(String name) {
-        int h = Math.abs(name.toLowerCase(Locale.ROOT).hashCode());
-        float hue = (h % 360) / 360f;
-        float sat = 0.65f;
-        float bri = 0.90f;
-        return Color.getHSBColor(hue, sat, bri);
+    private String colorForUser(String user) {
+        if (!userColors.containsKey(user)) {
+            Random rand = new Random(user.hashCode());
+            Color c = new Color(100 + rand.nextInt(155),
+                    100 + rand.nextInt(155),
+                    100 + rand.nextInt(155));
+            userColors.put(user, c);
+        }
+        Color c = userColors.get(user);
+        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
     }
 
     public static void main(String[] args) {

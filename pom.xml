@@ -21,6 +21,13 @@
             <artifactId>activemq-client</artifactId>
             <version>5.18.3</version>
         </dependency>
+
+        <!-- FlatLaf - Look and Feel moderno -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.5.1</version>
+        </dependency>
     </dependencies>
 
     <build>

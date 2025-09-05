@@ -40,9 +40,15 @@ public class TalksyChat {
     // conjunto global (por processo) dos usuários online
     private static final Set<String> onlineUsers = ConcurrentHashMap.newKeySet();
 
+    // 🔹 Construtor "real"
     public TalksyChat(String brokerUrl, String username) {
         this.brokerUrl = brokerUrl;
         this.username = username;
+    }
+
+    // 🔹 Construtor vazio (compatibilidade com UI antiga)
+    public TalksyChat() {
+        this("tcp://localhost:61616", "guest-" + UUID.randomUUID().toString().substring(0, 5));
     }
 
     public void setOnMessage(MessageCallback onMessage) {
@@ -60,20 +66,22 @@ public class TalksyChat {
     public void connect() throws JMSException {
         ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory(brokerUrl);
         connection = cf.createConnection();
-        connection.setClientID("talksy-" + username + "-" + UUID.randomUUID());
+        // Removido setClientID para evitar problemas
+        // connection.setClientID("talksy-" + username + "-" + UUID.randomUUID());
         session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
         publicTopic = session.createTopic(PUBLIC_TOPIC);
         Queue myPrivateQueue = session.createQueue(PRIVATE_PREFIX + username);
 
-        publicProducer = session.createProducer(publicTopic);
-        publicProducer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
-
+        // Cria consumidor público antes do produtor
         publicConsumer = session.createConsumer(publicTopic);
         publicConsumer.setMessageListener(msg -> handleIncoming(msg, false));
 
         privateConsumer = session.createConsumer(myPrivateQueue);
         privateConsumer.setMessageListener(msg -> handleIncoming(msg, true));
+
+        publicProducer = session.createProducer(publicTopic);
+        publicProducer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
         connection.start();
 
@@ -89,26 +97,29 @@ public class TalksyChat {
             TextMessage tm = (TextMessage) message;
             String type = tm.getStringProperty("type");
             String sender = tm.getStringProperty("sender");
+            String text = tm.getText();
+
+            // Debug
+            System.out.println("Received message from " + sender + ": " + text + " (private=" + isPrivate + ")");
 
             if (PRESENCE_TYPE.equals(type)) {
-                String action = tm.getText();
-                switch (action) {
+                // Presença
+                switch (text) {
                     case PRESENCE_JOIN:
                         onlineUsers.add(sender);
-                        if (onMessage != null) onMessage.onMessage("sistema", sender + " entrou no chat.", false);
+                        if (onMessage != null)
+                            onMessage.onMessage("sistema", sender + " entrou no chat.", false);
                         break;
-
                     case PRESENCE_LEAVE:
                         onlineUsers.remove(sender);
-                        if (onMessage != null) onMessage.onMessage("sistema", sender + " saiu do chat.", false);
+                        if (onMessage != null)
+                            onMessage.onMessage("sistema", sender + " saiu do chat.", false);
                         break;
-
                     case PRESENCE_SYNC_REQUEST:
                         if (!sender.equals(username)) {
                             sendPresence(PRESENCE_SYNC_RESPONSE);
                         }
                         break;
-
                     case PRESENCE_SYNC_RESPONSE:
                         onlineUsers.add(sender);
                         break;
@@ -117,12 +128,15 @@ public class TalksyChat {
                 return;
             }
 
-            // mensagem normal -> entregar remetente e texto puro para a UI
-            String text = tm.getText();
+            // Ignorar mensagem pública enviada por mim para evitar duplicação
+            if (!isPrivate && sender.equals(username)) {
+                return;
+            }
+
             if (onMessage != null) onMessage.onMessage(sender, text, isPrivate);
 
         } catch (JMSException e) {
-            // opcional: logar erro
+            e.printStackTrace();
         }
     }
 
@@ -134,8 +148,8 @@ public class TalksyChat {
     }
 
     /** Mensagem privada (Queue) */
-    public void sendPrivate(String toUser, String text) throws JMSException {
-        Queue targetQueue = session.createQueue(PRIVATE_PREFIX + toUser);
+    public void sendPrivate(String toUser , String text) throws JMSException {
+        Queue targetQueue = session.createQueue(PRIVATE_PREFIX + toUser );
         MessageProducer p = session.createProducer(targetQueue);
         p.setDeliveryMode(DeliveryMode.PERSISTENT);
         TextMessage msg = session.createTextMessage(text);
