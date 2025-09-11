@@ -48,7 +48,7 @@ public class TalksyChat {
 
     // 🔹 Construtor vazio (compatibilidade com UI antiga)
     public TalksyChat() {
-        this("tcp://localhost:61616", "guest-" + UUID.randomUUID().toString().substring(0, 5));
+        this("tcp://192.168.1.19:61616", "guest-" + UUID.randomUUID().toString().substring(0, 5));
     }
 
     public void setOnMessage(MessageCallback onMessage) {

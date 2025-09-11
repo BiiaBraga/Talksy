@@ -15,7 +15,7 @@ public class TalksyUI extends JFrame {
     private final JTextPane chatPane;
     private final JTextField inputField;
     private final JButton sendButton;
-    private final JButton privateButton; // novo botão
+    private final JButton privateButton;
     private final DefaultListModel<String> userListModel;
     private final JList<String> userList;
     private final Map<String, Color> userColors = new HashMap<>();
@@ -38,10 +38,21 @@ public class TalksyUI extends JFrame {
             System.exit(0);
         }
 
+        String serverIp = JOptionPane.showInputDialog(
+                null,
+                "Digite o IP do servidor ActiveMQ (ex: 192.168.0.10):",
+                "Conectar ao Talksy",
+                JOptionPane.PLAIN_MESSAGE
+        );
+
+        if (serverIp == null || serverIp.trim().isEmpty()) {
+            System.exit(0);
+        }
+
         setTitle("💬 Talksy Chat - " + myUsername);
 
         // ===== BACKEND =====
-        chat = new TalksyChat("tcp://localhost:61616", myUsername);
+        chat = new TalksyChat("tcp://" + serverIp + ":61616", myUsername);
 
         // ===== ÁREA DE CHAT =====
         chatPane = new JTextPane();
@@ -64,7 +75,7 @@ public class TalksyUI extends JFrame {
 
         privateButton = new JButton("Privado");
         privateButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        privateButton.setBackground(new Color(255, 152, 0)); // laranja
+        privateButton.setBackground(new Color(255, 152, 0));
         privateButton.setForeground(Color.WHITE);
 
         sendButton.setFocusPainted(false);
