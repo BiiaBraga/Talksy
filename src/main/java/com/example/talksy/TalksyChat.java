@@ -66,14 +66,12 @@ public class TalksyChat {
     public void connect() throws JMSException {
         ActiveMQConnectionFactory cf = new ActiveMQConnectionFactory(brokerUrl);
         connection = cf.createConnection();
-        // Removido setClientID para evitar problemas
-        // connection.setClientID("talksy-" + username + "-" + UUID.randomUUID());
         session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 
         publicTopic = session.createTopic(PUBLIC_TOPIC);
         Queue myPrivateQueue = session.createQueue(PRIVATE_PREFIX + username);
 
-        // Cria consumidor público antes do produtor
+        // Consumidores
         publicConsumer = session.createConsumer(publicTopic);
         publicConsumer.setMessageListener(msg -> handleIncoming(msg, false));
 
@@ -98,9 +96,6 @@ public class TalksyChat {
             String type = tm.getStringProperty("type");
             String sender = tm.getStringProperty("sender");
             String text = tm.getText();
-
-            // Debug
-            System.out.println("Received message from " + sender + ": " + text + " (private=" + isPrivate + ")");
 
             if (PRESENCE_TYPE.equals(type)) {
                 // Presença
@@ -128,12 +123,14 @@ public class TalksyChat {
                 return;
             }
 
-            // Ignorar mensagem pública enviada por mim para evitar duplicação
-            if (!isPrivate && sender.equals(username)) {
+            // Ignorar TODAS as mensagens enviadas por mim (evita duplicação)
+            if (sender != null && sender.equals(username)) {
                 return;
             }
 
-            if (onMessage != null) onMessage.onMessage(sender, text, isPrivate);
+            if (onMessage != null) {
+                onMessage.onMessage(sender, text, isPrivate);
+            }
 
         } catch (JMSException e) {
             e.printStackTrace();
@@ -149,11 +146,14 @@ public class TalksyChat {
 
     /** Mensagem privada (Queue) */
     public void sendPrivate(String toUser , String text) throws JMSException {
-        Queue targetQueue = session.createQueue(PRIVATE_PREFIX + toUser );
+        Queue targetQueue = session.createQueue(PRIVATE_PREFIX + toUser);
         MessageProducer p = session.createProducer(targetQueue);
         p.setDeliveryMode(DeliveryMode.PERSISTENT);
+
         TextMessage msg = session.createTextMessage(text);
         msg.setStringProperty("sender", username);
+        msg.setBooleanProperty("isPrivate", true);
+
         p.send(msg);
         p.close();
     }

@@ -33,10 +33,7 @@ public class TalksyUI extends JFrame {
                 "Login no Talksy",
                 JOptionPane.PLAIN_MESSAGE
         );
-
-        if (myUsername == null || myUsername.trim().isEmpty()) {
-            System.exit(0);
-        }
+        if (myUsername == null || myUsername.trim().isEmpty()) System.exit(0);
 
         String serverIp = JOptionPane.showInputDialog(
                 null,
@@ -44,10 +41,7 @@ public class TalksyUI extends JFrame {
                 "Conectar ao Talksy",
                 JOptionPane.PLAIN_MESSAGE
         );
-
-        if (serverIp == null || serverIp.trim().isEmpty()) {
-            System.exit(0);
-        }
+        if (serverIp == null || serverIp.trim().isEmpty()) System.exit(0);
 
         setTitle("💬 Talksy Chat - " + myUsername);
 
@@ -60,7 +54,6 @@ public class TalksyUI extends JFrame {
         chatPane.setDocument(doc);
         chatPane.setEditable(false);
         chatPane.setBorder(new EmptyBorder(10, 10, 10, 10));
-
         JScrollPane chatScroll = new JScrollPane(chatPane);
 
         // ===== INPUT =====
@@ -117,9 +110,7 @@ public class TalksyUI extends JFrame {
         chat.setOnPresenceUpdate(() ->
                 SwingUtilities.invokeLater(() -> {
                     userListModel.clear();
-                    for (String u : chat.getOnlineUsers()) {
-                        userListModel.addElement(u);
-                    }
+                    for (String u : chat.getOnlineUsers()) userListModel.addElement(u);
                 }));
 
         // ===== CONEXÃO =====
@@ -150,9 +141,7 @@ public class TalksyUI extends JFrame {
 
     private void sendMessage(boolean isPrivate) {
         String text = inputField.getText().trim();
-        if (text.isEmpty()) {
-            return;
-        }
+        if (text.isEmpty()) return;
 
         try {
             if (isPrivate) {
@@ -161,17 +150,13 @@ public class TalksyUI extends JFrame {
                     appendSystemMessage("⚠️ Selecione um usuário na lista para enviar mensagem privada.");
                     return;
                 }
-
                 appendMessage("Para " + targetUser, text, true);
                 chat.sendPrivate(targetUser, text);
-
             } else {
                 appendMessage(myUsername, text, false);
                 chat.sendPublic(text);
             }
-
             inputField.setText("");
-
         } catch (JMSException ex) {
             JOptionPane.showMessageDialog(this,
                     "Erro ao enviar mensagem: " + ex.getMessage(),
@@ -194,9 +179,9 @@ public class TalksyUI extends JFrame {
     private void appendMessage(String sender, String message, boolean isPrivate) {
         try {
             String color = colorForUser(sender);
-            String align = sender.equals(myUsername) ? "right" : "left";
+            String align;
             String bgColor;
-            String textColor;
+            String textColor = "black";
             String privateTag = "";
 
             if ("sistema".equalsIgnoreCase(sender)) {
@@ -204,17 +189,19 @@ public class TalksyUI extends JFrame {
                 return;
             }
 
-            if (sender.equals(myUsername)) {
-                bgColor = "#e3edf6ff";   // azul para mim
-                textColor = "black";
-            } else {
-                bgColor = "#f4dee6ff";   // cinza para outros
-                textColor = "black";
-            }
-
             if (isPrivate) {
                 privateTag = "<i style='font-size:10px; color:#555;'> (privado)</i>";
-                bgColor = "#f6f3daff"; // fundo amarelo
+                if (sender.startsWith("Para ")) {
+                    align = "right";
+                    bgColor = "#f6f3da"; // amarelo claro para mensagens privadas enviadas
+                } else {
+                    align = "left";
+                    bgColor = "#f6f3da"; // amarelo claro para mensagens privadas recebidas
+                    sender = "De " + sender;
+                }
+            } else {
+                align = sender.equals(myUsername) ? "right" : "left";
+                bgColor = sender.equals(myUsername) ? "#e3edf6" : "#f4dee6"; // azul para mim, rosa para outros
             }
 
             kit.insertHTML(doc, doc.getLength(),
