@@ -1,4 +1,4 @@
-# 💬 Talksy — Chat JMS com ActiveMQ
+# Talksy — Chat JMS com ActiveMQ
 
 O **Talksy** é um chat multiusuário estilo “bate-papo UOL” desenvolvido em **Java (Swing + JMS)**, utilizando **ActiveMQ** como broker de mensagens.  
 Suporta:
@@ -9,7 +9,7 @@ Suporta:
 
 ---
 
-## 🖥️ Requisitos
+## Requisitos
 
 - **Sistema Operacional**: Windows 10/11 (testado), Linux ou macOS também funcionam
 - **Java JDK**: 11 ou superior (projeto usa Java 19 nos testes)
@@ -18,7 +18,7 @@ Suporta:
 
 ---
 
-## 📦 Instalação dos requisitos
+## Instalação dos requisitos
 
 ### 1. Java JDK
 1. Baixe em: [https://adoptium.net/](https://adoptium.net/) ou [https://www.oracle.com/java/technologies/downloads/](https://www.oracle.com/java/technologies/downloads/)  
@@ -64,7 +64,7 @@ Suporta:
 
 ---
 
-## ⚙️ Como compilar e executar o Talksy
+## Como compilar e executar o Talksy
 
 ### 1. Compilar
 ```powershell
@@ -80,24 +80,26 @@ Isso abre a janela do Talksy (Swing GUI).
 
 ---
 
-## 🧪 Testando com múltiplos usuários
+## Testando com múltiplos usuários
 
 1. Deixe o **ActiveMQ rodando**.  
 2. Em um terminal, rode:
    ```powershell
    mvn exec:java
    ```
-   → Digite um apelido, ex.: `Biia`  
+   → Digite um apelido, ex.: `Biia` 
+   → Depois, digite o IP do servidor, ex.: 192.168.1.19 
 3. Abra outro terminal e rode de novo:
    ```powershell
    mvn exec:java
    ```
-   → Digite outro apelido, ex.: `Lucas`  
+   → Digite outro apelido, ex.: `Lucas` 
+   → Digite o mesmo IP do servidor, ex.: 192.168.1.19  
 4. Agora você pode trocar mensagens públicas e privadas entre as janelas.
 
 ---
 
-## 🧪 Executando em rede (múltiplos computadores)
+## Executando em rede (múltiplos computadores)
 
 **No servidor (onde o AcitiveMQ vai rodar):**
 
@@ -123,15 +125,13 @@ Isso abre a janela do Talksy (Swing GUI).
    - Clique em Concluir.
 
 **Nos clientes (outros PCs da rede):**
-1. No campo Broker, em vez de tcp://localhost:61616, digite:
-   tcp://<IP_DO_SERVIDOR>:61616
-   exemplo: tcp://192.168.1.19:61616
-
-   → Digite um apelido, ex.: `Biia` e conecte
+1. Ao iniciar o Talksy, informe:
+   - Nome de usuário (apelido)
+   - IP do servidor (onde o ActiveMQ está rodando)
 
 ---
 
-## 📂 Estrutura do projeto
+## Estrutura do projeto
 
 ```
 Talksy/
@@ -146,5 +146,5 @@ Talksy/
 
 ---
 
-## 👨‍💻 Autores
+## Autores
 Projeto acadêmico desenvolvido em Java, com ActiveMQ (JMS) por Beatriz Braga Silva e Lucas Silva Cardoso dos Santos
