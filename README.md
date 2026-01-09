@@ -1,5 +1,9 @@
 # Talksy — Chat JMS com ActiveMQ
 
+<p align="center">
+  <img src="talksy.png" alt="Screenshot do Talksy" width="600"/>
+</p>
+
 O **Talksy** é um chat multiusuário estilo “bate-papo UOL” desenvolvido em **Java (Swing + JMS)**, utilizando **ActiveMQ** como broker de mensagens.  
 Suporta:
 - Sala pública (Topic)
